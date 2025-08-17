@@ -46,7 +46,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "http://localhost:3000",            # Local development
-        "https://*.squarespace.com",        # Any Squarespace domain
+        "https://dragonfly-chihuahua-alhg.squarespace.com/",        # Any Squarespace domain
         "https://ai-chatbot2-tjm1.onrender.com",           # Any Render domain
         "http://localhost:8501",            # Streamlit local development
         "*"                                 # Allow all origins for now (remove in production)
