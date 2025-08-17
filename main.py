@@ -16,7 +16,7 @@ import logging
 import json
 from typing import Optional, Dict, List
 import re
-
+import base64 
 security = HTTPBearer()
 API_TOKEN = os.getenv("API_TOKEN")
 if not API_TOKEN:
@@ -37,12 +37,14 @@ logger = logging.getLogger(__name__)
 # Create FastAPI app first
 app = FastAPI(title="Motherboard Career Assistant", version="1.0.0")
 
-# Add CORS middleware
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-        "https://your-squarespace-domain.com",
-        "http://localhost:3000"
+        "http://localhost:3000",            # Local development
+        "https://*.squarespace.com",        # Any Squarespace domain
+        "https://*.onrender.com",           # Any Render domain
+        "http://localhost:8501"             # Streamlit local development
     ],
     allow_credentials=True,
     allow_methods=["*"],
@@ -72,13 +74,23 @@ async def startup_event():
         logger.error(f"Error details: {str(e)}")
         raise
 
+
 # Google Sheets setup
 scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
 try:
-    creds = ServiceAccountCredentials.from_json_keyfile_name("gcreds.json", scope)
+    # Get base64 encoded credentials from environment variable
+    google_creds_b64 = os.getenv('GOOGLE_CREDENTIALS')
+    if not google_creds_b64:
+        raise Exception("GOOGLE_CREDENTIALS not found in environment variables")
+    
+    # Decode and load credentials
+    creds_dict = json.loads(base64.b64decode(google_creds_b64))
+    creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
     gs_client = gspread.authorize(creds)
+    logger.info("Successfully initialized Google Sheets client")
 except Exception as e:
     logger.error(f"Failed to initialize Google Sheets client: {e}")
+    raise
 
 
 
