@@ -1,6 +1,6 @@
 from fastapi import FastAPI, Request, UploadFile, File, HTTPException, Depends, status
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, HTMLResponse
 import secrets
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 import openai
@@ -17,6 +17,7 @@ import json
 from typing import Optional, Dict, List
 import re
 import base64 
+
 security = HTTPBearer()
 API_TOKEN = os.getenv("API_TOKEN")
 if not API_TOKEN:
@@ -35,16 +36,20 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Create FastAPI app first
-app = FastAPI(title="Motherboard Career Assistant", version="1.0.0")
-
+app = FastAPI(
+    title="Motherboard Career Assistant API", 
+    version="1.0.0",
+    description="API for the Motherboard Career Assistant - helping mothers navigate work and career"
+)
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "http://localhost:3000",            # Local development
         "https://*.squarespace.com",        # Any Squarespace domain
-        "https://*.onrender.com",           # Any Render domain
-        "http://localhost:8501"             # Streamlit local development
+        "https://ai-chatbot2-tjm1.onrender.com",           # Any Render domain
+        "http://localhost:8501",            # Streamlit local development
+        "*"                                 # Allow all origins for now (remove in production)
     ],
     allow_credentials=True,
     allow_methods=["*"],
@@ -74,7 +79,6 @@ async def startup_event():
         logger.error(f"Error details: {str(e)}")
         raise
 
-
 # Google Sheets setup
 scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
 try:
@@ -91,8 +95,6 @@ try:
 except Exception as e:
     logger.error(f"Failed to initialize Google Sheets client: {e}")
     raise
-
-
 
 # FAQ knowledge base
 FAQ_DATA = {
@@ -159,6 +161,94 @@ def get_ai_response(messages: List[Dict], max_tokens: int = 500) -> str:
         logger.error(f"OpenAI API error: {e}")
         return "I'm sorry, I'm having trouble processing your request right now. Please try again later."
 
+# ROOT ENDPOINT - This fixes the 404 error
+@app.get("/", response_class=HTMLResponse)
+async def root():
+    """Root endpoint with API documentation"""
+    html_content = """
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>Motherboard Career Assistant API</title>
+        <style>
+            body { font-family: Arial, sans-serif; margin: 40px; background-color: #f5f5f5; }
+            .container { max-width: 800px; margin: 0 auto; background: white; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+            h1 { color: #667eea; }
+            .endpoint { background: #f8f9fa; padding: 15px; margin: 10px 0; border-radius: 5px; border-left: 4px solid #667eea; }
+            .method { color: #28a745; font-weight: bold; }
+            code { background: #e9ecef; padding: 2px 6px; border-radius: 3px; }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <h1>👩‍💼 Motherboard Career Assistant API</h1>
+            <p>Welcome to the Motherboard Career Assistant API - helping mothers navigate work and career!</p>
+            
+            <h2>🚀 API Status</h2>
+            <p><strong>Status:</strong> <span style="color: green;">✅ Running</span></p>
+            <p><strong>Version:</strong> 1.0.0</p>
+            
+            <h2>📋 Available Endpoints</h2>
+            
+            <div class="endpoint">
+                <span class="method">POST</span> <code>/welcome</code>
+                <p>Welcome and onboard new users</p>
+            </div>
+            
+            <div class="endpoint">
+                <span class="method">POST</span> <code>/cv-tips</code>
+                <p>Upload CV file for personalized feedback</p>
+            </div>
+            
+            <div class="endpoint">
+                <span class="method">POST</span> <code>/search-jobs</code>
+                <p>Search for jobs based on user query</p>
+            </div>
+            
+            <div class="endpoint">
+                <span class="method">POST</span> <code>/career-path</code>
+                <p>Get personalized career guidance</p>
+            </div>
+            
+            <div class="endpoint">
+                <span class="method">POST</span> <code>/subscribe</code>
+                <p>Subscribe for job alerts and notifications</p>
+            </div>
+            
+            <div class="endpoint">
+                <span class="method">POST</span> <code>/faq</code>
+                <p>Ask questions about career, work-life balance</p>
+            </div>
+            
+            <div class="endpoint">
+                <span class="method">GET</span> <code>/health</code>
+                <p>Health check endpoint</p>
+            </div>
+            
+            <div class="endpoint">
+                <span class="method">GET</span> <code>/docs</code>
+                <p>Interactive API documentation (Swagger UI)</p>
+            </div>
+            
+            <h2>🔐 Authentication</h2>
+            <p>Most endpoints require authentication. Include your API token in the Authorization header:</p>
+            <code>Authorization: Bearer YOUR_API_TOKEN</code>
+            
+            <h2>📖 Documentation</h2>
+            <p>Visit <a href="/docs">/docs</a> for interactive API documentation</p>
+            <p>Visit <a href="/redoc">/redoc</a> for alternative documentation</p>
+            
+            <h2>💡 Example Usage</h2>
+            <pre style="background: #f8f9fa; padding: 15px; border-radius: 5px; overflow-x: auto;">
+curl -X POST "https://your-api-url.com/health" \\
+  -H "Content-Type: application/json"
+            </pre>
+        </div>
+    </body>
+    </html>
+    """
+    return HTMLResponse(content=html_content, status_code=200)
+
 @app.post("/welcome")
 async def welcome_user(request: Request, token: str = Depends(verify_token)):
     """Welcome and onboard new users"""
@@ -220,9 +310,6 @@ async def get_cv_tips(file: UploadFile = File(...), token: str = Depends(verify_
     
     except Exception as e:
         return {"error": str(e)}
-    
-    
-# Updated main.py - Job Search Endpoint
 
 @app.post("/search-jobs")
 async def search_jobs(request: Request, token: str = Depends(verify_token)):
@@ -250,8 +337,7 @@ async def search_jobs(request: Request, token: str = Depends(verify_token)):
     except Exception as e:
         logger.error(f"Search error: {str(e)}")
         return {"error": "Search failed", "details": str(e)}
-    
-    
+
 @app.post("/career-path")
 async def suggest_career_path(request: Request, token: str = Depends(verify_token)):
     """Provide career guidance from a single free-form query"""
@@ -306,7 +392,6 @@ async def suggest_career_path(request: Request, token: str = Depends(verify_toke
             status_code=500,
             content={"error": "Sorry, I couldn't provide career guidance right now."}
         )
-
 
 @app.post("/subscribe")
 async def subscribe_user(request: Request, token: str = Depends(verify_token)):
@@ -422,7 +507,6 @@ async def health_check():
 @app.get("/test-auth")
 async def test_auth(token: str = Depends(verify_token)):
     return {"message": "Authentication successful"}
-
 
 if __name__ == "__main__":
     import uvicorn
